@@ -68,30 +68,24 @@ public class GitHubAgedRefsTrait extends AgedRefsTrait {
      */
     public static class ExcludeOldBranchesSCMHeadFilter extends ExcludeBranchesSCMHeadFilter{
 
-        public ExcludeOldBranchesSCMHeadFilter(int retentionDays) {
+        ExcludeOldBranchesSCMHeadFilter(int retentionDays) {
             super(retentionDays);
         }
 
         @Override
         public boolean isExcluded(@NonNull SCMSourceRequest scmSourceRequest, @NonNull SCMHead scmHead) throws IOException, InterruptedException {
             if (scmHead instanceof BranchSCMHead) {
-                Iterable<GHBranch> branches = ((GitHubSCMSourceRequest) scmSourceRequest).getBranches();
-                Iterator<GHBranch> branchIterator = branches.iterator();
-                while (branchIterator.hasNext()) {
-                    GHBranch branch = branchIterator.next();
+                GHBranch branch = ((GitHubSCMSourceRequest) scmSourceRequest).getRepository().getBranch(scmHead.getName());
+                if (branch != null) {
                     long branchTS = branch.getOwner().getCommit(branch.getSHA1()).getCommitDate().getTime();
-                    if (branch.getName().equals(scmHead.getName())) {
-                        return (Long.compare(branchTS, super.getAcceptableDateTimeThreshold()) < 0);
-                    }
+                    return (branchTS < getAcceptableDateTimeThreshold());
                 }
             } else if (scmHead instanceof PullRequestSCMHead) {
                 Iterable<GHPullRequest> pulls = ((GitHubSCMSourceRequest) scmSourceRequest).getPullRequests();
-                Iterator<GHPullRequest> pullIterator = pulls.iterator();
-                while (pullIterator.hasNext()) {
-                    GHPullRequest pull = pullIterator.next();
+                for (GHPullRequest pull : pulls) {
                     if (("PR-" + pull.getNumber()).equals(scmHead.getName())) {
                         long pullTS = pull.getHead().getCommit().getCommitShortInfo().getCommitDate().getTime();
-                        return (Long.compare(pullTS, super.getAcceptableDateTimeThreshold()) < 0);
+                        return (pullTS < super.getAcceptableDateTimeThreshold());
                     }
                 }
             }
